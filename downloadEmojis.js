@@ -1,39 +1,42 @@
 // ==UserScript==
 // @name         B站表情包下载
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8.1
 // @description  批量下载B站表情包/收藏集图片
 // @author       jzh
-// @match        https://*.bilibili.com/*
+// @author       xp911
+// @match        https://message.bilibili.com/*
 // @icon         https://www.bilibili.com/favicon.ico
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/2.6.1/jszip.min.js
 // @license      MIT
-// @downloadURL https://update.greasyfork.org/scripts/501819/B%E7%AB%99%E8%A1%A8%E6%83%85%E5%8C%85%E4%B8%8B%E8%BD%BD.user.js
-// @updateURL https://update.greasyfork.org/scripts/501819/B%E7%AB%99%E8%A1%A8%E6%83%85%E5%8C%85%E4%B8%8B%E8%BD%BD.meta.js
 // ==/UserScript==
 
-;(function () {
-  'use strict'
+(function() {
+  'use strict';
   const buttons = [
     {
-      selector: 'body > div.bili-emoji-picker.bili-emoji-picker--visible',
+      selector: '.bili-emoji-picker__emoji.img img',
       textContent: '下载选中系列表情包',
       alertMessage: '请先点击表情选项并选中需要下载的表情包'
-      // <img src="//xxx.webp" alt="[xxx]">
+      // <div class="bili-emoji-picker__emoji img">
+      //   <img src="//xxx.png@yyy" alt="[xxx]">
+      // </div>
     },
     {
-      selector: '.bili-im .right .dialog:not(.hide) .send-box .input-box .core-style img',
+      selector: '.brt-editor img',
       textContent: '下载输入框表情包',
       alertMessage: '输入框没有表情包'
-      // <img src="https://xxx.png" alt="[xxx]">
+      // <div class="brt-editor">
+      //   <img src="https://xxx.png" alt="[xxx]">
+      // </div>
     },
     {
-      selector: '.message-list-content .msg-item .emotion-items.emotion-items-big',
+      selector: '._Msg__Main_o7f0t_35 img',
       textContent: '下载对话框表情包',
       alertMessage: '对话框没有表情包'
-      // <a title="xxx">
-      //  <div style="background-image:url(http://xxx.png);"></div>
-      // </a>
+      // <div class="_Msg__Main_o7f0t_35">
+      //  <img src="https://xxx.png" alt="[xxx]">
+      // </div>
     },
     {
       textContent: '下载评论区表情包',
@@ -79,23 +82,23 @@
     flexDirection: 'column',
     justifyContent: 'center'
   })
-  for (let i = 0; i < 5; i++) {
+  for (let type = 0; type < buttons.length; type++) {
     if (isMessage) {
-      if (i !== 0 && i !== 1 && i !== 2) {
+      if (type !== 0 && type !== 1 && type !== 2) {
         continue
       }
     } else if (isComment) {
-      if (i !== 3) {
+      if (type !== 3) {
         continue
       }
     } else if (isBlackboard) {
-      if (i !== 4) {
+      if (type !== 4) {
         continue
       }
     } else {
       return
     }
-    const { selector, textContent } = buttons[i]
+    const { selector, textContent } = buttons[type]
     const button = document.createElement('button')
     button.textContent = textContent
     Object.assign(button.style, buttonStyle)
@@ -105,11 +108,11 @@
         if (isMessage) {
           emojis = getMessageEmojis(selector)
         } else if (isComment) {
-          emojis = getCommentEmojis()
+          alert('暂不支持')
         } else if (isBlackboard) {
-          emojis = getBlackboardEmojis()
+          alert('暂不支持')
         }
-        downloadEmojis(emojis, i)
+        downloadEmojis(emojis, type)
       } catch (e) {
         console.log(e)
       }
@@ -194,21 +197,10 @@
     let url, index
     switch (type) {
       case 0:
-        // url("https://xxx.png")
-        // url("//xxx.png"
-        url = item.style.backgroundImage
-        // return item.style.backgroundImage.match(/url\((")(.*?)\1\)/)?.[2]
-        return url.replace('url("', '').replace('")', '') || url
       case 1:
-        return item.src
       case 2:
-        // 'url("https://xxx.png")'
-        // 'url("http://xxx.png")'
-        url = item.querySelector('.img-emoji-big').style.backgroundImage
-        // return backgroundImage.match(/url\((")(.*?)\1\)/)?.[2].replace('http:', 'https:')
-        return url.replace('url("', '').replace('")', '').replace('http:', 'https:') || url
       case 3:
-        // //xxx.png@yyy
+        // xxx.png@yyy
         url = item.src
         index = url.indexOf('@')
         return index > 0 ? url.slice(0, index) : url
@@ -221,12 +213,8 @@
   function getImgName(item, type) {
     switch (type) {
       case 0:
-        return item.title.slice(1, -1) || item.title
       case 1:
-        return item.alt.slice(1, -1) || item.alt
       case 2:
-        return item.title
-      case 3:
         return item.alt.slice(1, -1) || item.alt
       case 4:
         return item.querySelector('.name').innerText
@@ -235,7 +223,8 @@
   function getZipName(item, type) {
     switch (type) {
       case 0:
-        return item.title.slice(1, -1).match(/^(.*?)_/)?.[1] || item.title
+        // <div class="bili-emoji-picker__header">xxx</div>
+        return document.querySelector('.bili-emoji-picker__header').textContent
       default:
         return getImgName(item, type) + '等'
     }
@@ -252,14 +241,10 @@
       }
     })
   }
-  function downloadEmojis(emojis, i) {
+  function downloadEmojis(emojis, type) {
     const seen = new Set()
     const filteredEmojis = emojis.filter(item => {
-      const imgName = getImgName(item, i)
-      if (i !== 0 && i !== 4 && !imgName.includes('_')) {
-        // 排除普通表情
-        return false
-      }
+      const imgName = getImgName(item, type)
       if (!seen.has(imgName)) {
         seen.add(imgName)
         return true
@@ -267,7 +252,7 @@
       return false
     })
     if (filteredEmojis.length === 0) {
-      alert(buttons[i].alertMessage)
+      alert(buttons[type].alertMessage)
       return
     }
     let zipName = ''
@@ -275,11 +260,11 @@
     const zip = new JSZip()
     const promises = filteredEmojis.map(async (item, imgIndex) => {
       if (imgIndex === 0) {
-        zipName = getZipName(item, i)
+        zipName = getZipName(item, type)
       }
-      const url = getUrl(item, i)
+      const url = getUrl(item, type)
       zip.file(
-        getImgName(item, i) + '.' + url.split('.').pop(),
+        getImgName(item, type) + '.' + url.split('.').pop(),
         await blobToBinary(await (await fetch(url)).blob())
       )
     })
@@ -294,4 +279,4 @@
       URL.revokeObjectURL(url)
     })
   }
-})()
+})();
