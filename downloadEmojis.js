@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         B站表情包下载
 // @namespace    http://tampermonkey.net/
-// @version      1.8.1
+// @version      1.8.2
 // @description  批量下载B站表情包/收藏集图片
 // @author       jzh
 // @author       xp911
 // @match        https://message.bilibili.com/*
+// @match        https://www.bilibili.com/blackboard/*
 // @icon         https://www.bilibili.com/favicon.ico
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/2.6.1/jszip.min.js
 // @license      MIT
@@ -44,12 +45,13 @@
       // <img src="//xxx.png@yyy" alt="[xxx]">
     },
     {
+      selector: '.card-item',
       textContent: '下载收藏集图片',
-      alertMessage: '请参照教程打开收藏集卡池详情'
+      alertMessage: '请打开收藏集卡池详情'
       // <div class="card-item">
       //   <div class="card-container">
-      //     <div class="card">
-      //       <div class="card-img">
+      //     <div class="card card-small">
+      //       <div class="bfs-img card-img">
       //         <img src="https://xxx.png@yyy" class="img" />
       //       </div>
       //     </div>
@@ -110,7 +112,7 @@
         } else if (isComment) {
           alert('暂不支持')
         } else if (isBlackboard) {
-          alert('暂不支持')
+          emojis = getBlackboardEmojis()
         }
         downloadEmojis(emojis, type)
       } catch (e) {
@@ -188,10 +190,7 @@
     return Array.from(
       document
         .querySelector('#mall-iframe')
-        .contentDocument.querySelectorAll(
-          '#app .digital-card .digital-card-content .drawer .content .v-switcher .v-switcher__content .v-switcher__content__wrap .v-switcher__content__item .dlc-detail .dlc-cards .scarcity-block'
-        )
-    ).flatMap(item => Array.from(item.querySelectorAll('.card-block .card-item')))
+        .contentDocument.querySelectorAll('.card-block .card-item'))
   }
   function getUrl(item, type) {
     let url, index
@@ -205,7 +204,7 @@
         index = url.indexOf('@')
         return index > 0 ? url.slice(0, index) : url
       case 4:
-        url = item.querySelector('.card-container .card .card-img img').src
+        url = item.querySelector('.card-container .card.card-small .bfs-img.card-img img').src
         index = url.indexOf('@')
         return index > 0 ? url.slice(0, index) : url
     }
@@ -217,7 +216,7 @@
       case 2:
         return item.alt.slice(1, -1) || item.alt
       case 4:
-        return item.querySelector('.name').innerText
+        return item.querySelector('.name').textContent
     }
   }
   function getZipName(item, type) {
@@ -225,6 +224,9 @@
       case 0:
         // <div class="bili-emoji-picker__header">xxx</div>
         return document.querySelector('.bili-emoji-picker__header').textContent
+      case 4:
+        // <div class="lottery-name">xxx</div>
+        return document.querySelector('#mall-iframe').contentDocument.querySelector('.lottery-name').textContent
       default:
         return getImgName(item, type) + '等'
     }
