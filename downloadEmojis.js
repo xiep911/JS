@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站表情包下载
 // @namespace    http://tampermonkey.net/
-// @version      1.8.2
+// @version      1.8.3
 // @description  批量下载B站表情包/收藏集图片
 // @author       jzh
 // @author       xp911
@@ -10,6 +10,8 @@
 // @icon         https://www.bilibili.com/favicon.ico
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/2.6.1/jszip.min.js
 // @license      MIT
+// @downloadURL  https://github.com/xiep911/JS/blob/main/downloadEmojis.js
+// @updateURL  https://github.com/xiep911/JS/blob/main/downloadEmojis.js
 // ==/UserScript==
 
 (function() {
@@ -45,7 +47,7 @@
       // <img src="//xxx.png@yyy" alt="[xxx]">
     },
     {
-      selector: '.card-item',
+      selector: '.card-block .card-item',
       textContent: '下载收藏集图片',
       alertMessage: '请打开收藏集卡池详情'
       // <div class="card-item">
@@ -57,6 +59,23 @@
       //     </div>
       //   </div>
       //   <div class="name">xxx</div>
+      // </div>
+    },
+    {
+      selector: '.reward-list .reward-item',
+      textContent: '下载收藏集收集奖励',
+      alertMessage: '请打开收藏集主页'
+      // <div class="reward-item">
+      //   <div class="reward-item-left">
+      //     <div class="bfs-img card-img">
+      //       <img src="https://xxx.png@yyy" class="img" />
+      //     </div>
+      //   </div>
+      //   <div class="reward-item-right">
+      //     <div class="reward-header">
+      //       <div class="reward-name ellipsis">xxx</div>
+      //     </div>
+      //   </div>
       // </div>
     }
   ]
@@ -94,7 +113,7 @@
         continue
       }
     } else if (isBlackboard) {
-      if (type !== 4) {
+      if (type !== 4 && type !== 5) {
         continue
       }
     } else {
@@ -112,7 +131,7 @@
         } else if (isComment) {
           alert('暂不支持')
         } else if (isBlackboard) {
-          emojis = getBlackboardEmojis()
+          emojis = getBlackboardEmojis(selector)
         }
         downloadEmojis(emojis, type)
       } catch (e) {
@@ -186,11 +205,11 @@
       )
     )
   }
-  function getBlackboardEmojis() {
+  function getBlackboardEmojis(selector) {
     return Array.from(
       document
         .querySelector('#mall-iframe')
-        .contentDocument.querySelectorAll('.card-block .card-item'))
+        .contentDocument.querySelectorAll(selector))
   }
   function getUrl(item, type) {
     let url, index
@@ -201,13 +220,16 @@
       case 3:
         // xxx.png@yyy
         url = item.src
-        index = url.indexOf('@')
-        return index > 0 ? url.slice(0, index) : url
+        break
       case 4:
         url = item.querySelector('.card-container .card.card-small .bfs-img.card-img img').src
-        index = url.indexOf('@')
-        return index > 0 ? url.slice(0, index) : url
+        break
+      case 5:
+        url = item.querySelector('.reward-item-left .bfs-img img').src
+        break
     }
+    index = url.indexOf('@')
+    return index > 0 ? url.slice(0, index) : url
   }
   function getImgName(item, type) {
     switch (type) {
@@ -217,6 +239,8 @@
         return item.alt.slice(1, -1) || item.alt
       case 4:
         return item.querySelector('.name').textContent
+      case 5:
+        return item.querySelector('.reward-name.ellipsis').textContent.replace(/\s+/g, '')
     }
   }
   function getZipName(item, type) {
@@ -227,6 +251,8 @@
       case 4:
         // <div class="lottery-name">xxx</div>
         return document.querySelector('#mall-iframe').contentDocument.querySelector('.lottery-name').textContent
+      case 5:
+        return getZipName(item, 4) + '收集奖励'
       default:
         return getImgName(item, type) + '等'
     }
