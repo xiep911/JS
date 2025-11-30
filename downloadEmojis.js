@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         B站表情包下载
+// @name         B站表情包下载2
 // @namespace    http://tampermonkey.net/
 // @version      1.8.3
 // @description  批量下载B站表情包/收藏集图片
